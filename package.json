@@ -1,0 +1,31 @@
+{
+  "name": "osmthree",
+  "version": "0.0.0",
+  "description": "Import OSM data into a three.js scene",
+  "main": "bin/osmthree.js",
+  "bin": {
+    "osmthree": "osmthree.js"
+  },
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:skewart/osmthree.git"
+  },
+  "keywords": [
+    "OSM",
+    "three.js",
+    "WebGL",
+    "buildings"
+  ],
+  "author": "Scott Ewart",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/skewart/osmthree/issues"
+  },
+  "homepage": "https://github.com/skewart/osmthree"
+}
