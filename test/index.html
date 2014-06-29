@@ -1,5 +1,48 @@
 <html>
   <body>
+  	<div id="canvasGoesHere" style="width:100%; height:100%; position:absolute;"></div>
+    <script src="/test/three.js"></script>
+    <script src="/test/orbitControls.js"></script>
     <script src="../bin/osmthree.js"></script>
+    <script>
+		
+		// Basic set up for development and testing
+
+		var S = {},
+			containerID = 'canvasGoesHere'
+
+		// Create the scene object
+		S.scene = new THREE.Scene();
+
+		// Renderer setup
+		S.renderer = new THREE.WebGLRenderer( { antialias: true } );
+		
+		// HTML element container
+		S.container = document.getElementById( containerID );
+
+		S.renderer.setSize( S.container.offsetWidth, S.container.offsetHeight );
+		S.container.appendChild( S.renderer.domElement );
+		
+		// Camera setup
+		//S.camera = new THREE.PerspectiveCamera( 45, S.container.innerHeight / S.container.innerWidth, 1, 1000 );
+		S.camera = new THREE.PerspectiveCamera( 45, S.container.offsetWidth / S.container.offsetHeight, 1, 10000 );
+		S.camera.position.z = 400;
+		S.camera.position.x = -400;
+		S.camera.position.y = 400;
+
+		// Controls setup
+		S.controls = new THREE.OrbitControls( S.camera, S.container );
+
+    	OSM3.loadData( S.scene, [ 114.15, 22.2675, 114.165, 22.275 ], { scale: 100000 } );
+
+    	function animate() {
+			S.controls.update();
+			S.renderer.render( S.scene, S.camera );
+			requestAnimationFrame( animate );
+    	}
+
+    	animate();
+
+    </script>
   </body>
 </html>
