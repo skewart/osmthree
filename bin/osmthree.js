@@ -1,7 +1,5 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 
-var controller = require('./controller.js');
-
 
 function constructor( scene, scale, origin ) {
 
@@ -9,8 +7,6 @@ function constructor( scene, scale, origin ) {
 		_scene = scene,
 		_scale = scale,
 		_origin = lonLatToWorld( origin[0], origin[1] );
-
-	controller.subscribe( 'dataReady', build );
 
 
 	function latlonDistMeters( lon1, lat1, lon2, lat2 ){  // generally used geo measurement function
@@ -39,7 +35,7 @@ function constructor( scene, scale, origin ) {
 	}
 
 
-	function build( items ) {
+	this.build = function( items ) {
 
 		var bldg, currVerLen,
 			mats = [],
@@ -48,6 +44,7 @@ function constructor( scene, scale, origin ) {
 
 		for ( var i=0, len=items.length; i < len; i++ ) {
 			bldg = makeBldgGeom( items[i] );
+			_scene.add( new THREE.Mesh( bldg, new THREE.MeshNormalMaterial() ) );
 			//currVerLen = geom.vertices.length;
 			//geom.vertices = geom.vertices.concat( bldg.vertices );
 			//geom.faces = geom.faces.concat( updateFaces( bldg.faces, currVerLen ) );
@@ -56,7 +53,6 @@ function constructor( scene, scale, origin ) {
 			//for ( var j = 0, fLen = bldg.faces.length; j < fLen; j++ ) {
 				//ids.push( i );
 			//}
-			_scene.add( new THREE.Mesh( bldg, new THREE.MeshNormalMaterial() ) );
 		}
 
 		// TODO Create the mesh object and any necessary material objects
@@ -112,201 +108,7 @@ function constructor( scene, scale, origin ) {
 }
 
 module.exports = constructor;
-},{"./controller.js":2}],2:[function(require,module,exports){
-
-// Implementing super simple pub-sub for now.  Can add unsubsubscribe if needed later.
-
-var events = {}
-
-function subscribe( eventName, callback ) {
-	if (!(events[ eventName ] instanceof Array )) {
-		events[ eventName ] = []
-	}
-	events[ eventName ].push( callback );
-}
-
-function publish( eventName, argsArray ) {
-	if (!(events[ eventName ] instanceof Array )) {
-		console.warn( "Published an event with no subscribers. --> " + eventName );
-		return;
-	}
-	for ( var i = 0, eL = events[ eventName ].length; i < eL; i++ ) {
-		events[ eventName ][i].apply( window, argsArray );
-	}
-}
-
-module.exports = {
-	subscribe: subscribe,
-	publish: publish
-}
-
-},{}],3:[function(require,module,exports){
-
-var importer = require('./importer.js' ),
-	controller = require( './controller.js' );
-
-var _nodes = {},
-	_ways = {},
-	_relations = {},
-	MAP_DATA = []
-
-
-function isBuilding(data) {
-	var tags = data.tags;
-	return (tags && !tags.landuse &&
-	  (tags.building || tags['building:part']) && (!tags.layer || tags.layer >= 0));
-}
-
-
-function getRelationWays(members) {
-	var m, outer, inner = [];
-	for (var i = 0, il = members.length; i < il; i++) {
-	  m = members[i];
-	  if (m.type !== 'way' || !_ways[m.ref]) {
-	    continue;
-	  }
-	  if (!m.role || m.role === 'outer') {
-	    outer = _ways[m.ref];
-	    continue;
-	  }
-	  if (m.role === 'inner' || m.role === 'enclave') {
-	    inner.push(_ways[m.ref]);
-	    continue;
-	  }
-	}
-
-	//  if (outer && outer.tags) {
-	if (outer) { // allows tags to be attached to relation - instead of outer way
-	  return { outer:outer, inner:inner };
-	}
-}
-
-
-function getFootprint(points) {
-    if (!points) {
-      return;
-    }
-
-    var footprint = [], p;
-    for (var i = 0, il = points.length; i < il; i++) {
-      	p = _nodes[ points[i] ];
-      	footprint.push(p[0], p[1]);
-    }
-
-    // do not close polygon yet
-    if (footprint[footprint.length-2] !== footprint[0] && footprint[footprint.length-1] !== footprint[1]) {
-      	footprint.push(footprint[0], footprint[1]);
-    }
-
-    // can't span a polygon with just 2 points (+ start & end)
-    if (footprint.length < 8) {
-      	return;
-    }
-
-    return footprint;
-}
-
-
-
-function mergeItems(dst, src) {
-    for (var p in src) {
-      if (src.hasOwnProperty(p)) {
-        dst[p] = src[p];
-      }
-    }
-    return dst;
-}
-
-
-function filterItem(item, footprint) {
-    var res = importer.alignProperties(item.tags);
-    res.tags = item.tags;  // Keeping the raw tags too
-    if (item.id) {
-      res.id = item.id;
-    }
-
-    if (footprint) {
-      res.footprint = importer.makeWinding(footprint, importer.clockwise);
-    }
-
-    if (res.shape === 'cone' || res.shape === 'cylinder') {
-      res.radius = importer.getRadius(res.footprint);
-    }
-
-    return res;
-}
-
-
-function processNode(node) {
-	_nodes[node.id] = [node.lat, node.lon];
-}
-
-
-function processWay(way) {
-	if (isBuilding(way)) {
-	  	var item, footprint;
-	  	if ( footprint = getFootprint(way.nodes) ) {
-	    	item = filterItem(way, footprint);
-	    	MAP_DATA.push(item);
-	  	}
-	  	return;
-	}
-
-	var tags = way.tags;
-	if (!tags || (!tags.highway && !tags.railway && !tags.landuse)) { // TODO: add more filters
-	  	_ways[way.id] = way;
-	}
-}
-
-
-function processRelation(relation) {
-	var relationWays, outerWay, holes = [],
-	  	item, relItem, outerFootprint, innerFootprint;
-	if (!isBuilding(relation) ||
-	  	(relation.tags.type !== 'multipolygon' && relation.tags.type !== 'building') ) {
-	  	return;
-	}
-
-	if ((relationWays = getRelationWays(relation.members))) {
-	  	relItem = filterItem(relation);
-	  	if ((outerWay = relationWays.outer)) {
-	    	if ((outerFootprint = getFootprint(outerWay.nodes)) && _callback(outerWay) !== false) {
-		      	item = filterItem(outerWay, outerFootprint);
-		      	for (var i = 0, il = relationWays.inner.length; i < il; i++) {
-		        	if ((innerFootprint = getFootprint(relationWays.inner[i].nodes))) {
-		          		holes.push( importer.makeWinding(innerFootprint, importer.counterClockwise) );
-		        	}
-		      	}
-		      	if (holes.length) {
-		        	item.holes = holes;
-		      	}
-		      	MAP_DATA.push( mergeItems(item, relItem) );
-	    	}
-	  	}
-	}
-}
-
-
-function process( osmData ) {
-	var item;
-	for ( var i = 0, len = osmData.elements.length; i < len; i++ ) {
-		item = osmData.elements[i];
-		switch ( item.type ) {
-			case 'node': processNode( item ); break;
-			case 'way': processWay( item ); break;
-			case 'relation': processRelation( item ); break;
-		}
-	}
-	controller.publish( 'dataReady', [ MAP_DATA ] )
-	return MAP_DATA;  // No real need for this return
-}
-
-
-module.exports = {
-	MAP_DATA: MAP_DATA,
-	process: process
-}
-},{"./controller.js":2,"./importer.js":4}],4:[function(require,module,exports){
+},{}],2:[function(require,module,exports){
 
 var YARD_TO_METER = 0.9144,
     FOOT_TO_METER = 0.3048,
@@ -564,115 +366,301 @@ module.exports = {
   }
 };
 
-},{}],5:[function(require,module,exports){
+},{}],3:[function(require,module,exports){
 
 
 // Loader is responsible for fetching data from the Overpass API
 
-var OSM_XAPI_URL = 'http://overpass-api.de/api/interpreter?data=[out:json];(way[%22building%22]({s},{w},{n},{e});node(w);way[%22building:part%22=%22yes%22]({s},{w},{n},{e});node(w);relation[%22building%22]({s},{w},{n},{e});way(r);node(w););out;';
-var FAKE_OVERPASS = '/test/fake_osm.json'
+function constructor() {
 
-var req = new XMLHttpRequest();
+	var OSM_XAPI_URL = 'http://overpass-api.de/api/interpreter?data=[out:json];(way[%22building%22]({s},{w},{n},{e});node(w);way[%22building:part%22=%22yes%22]({s},{w},{n},{e});node(w);relation[%22building%22]({s},{w},{n},{e});way(r);node(w););out;';
+	var FAKE_OVERPASS = '/test/fake_osm.json'
 
-function xhr(url, param, callback) {
+	var req = new XMLHttpRequest();
 
-	url = url.replace(/\{ *([\w_]+) *\}/g, function(tag, key) {
-		return param[key] || tag;
-	});
+	function xhr(url, param, callback) {
 
-	// function changeState(state) {
-	// 	if ('XDomainRequest' in win && state !== req.readyState) {
-	// 	  req.readyState = state;
-	// 	  if (req.onreadystatechange) {
-	// 	    req.onreadystatechange();
-	// 	  }
-	// 	}
-	// }
+		url = url.replace(/\{ *([\w_]+) *\}/g, function(tag, key) {
+			return param[key] || tag;
+		});
 
-	req.onerror = function() {
-		req.status = 500;
-		req.statusText = 'Error';
-//		changeState(4);
-	};
+		req.onerror = function() {
+			req.status = 500;
+			req.statusText = 'Error';
+		};
 
-	req.ontimeout = function() {
-		req.status = 408;
-		req.statusText = 'Timeout';
-//		changeState(4);
-	};
+		req.ontimeout = function() {
+			req.status = 408;
+			req.statusText = 'Timeout';
+		};
 
-	req.onprogress = function() {
-//		changeState(3);
-	};
+		req.onprogress = function() {
+		};
 
-	req.onload = function() {
-		req.status = 200;
-		req.statusText = 'Ok';
-//		changeState(4);
-	};
+		req.onload = function() {
+			req.status = 200;
+			req.statusText = 'Ok';
+		};
 
-	req.onreadystatechange = function() {
-		if (req.readyState !== 4) {
-		  return;
+		req.onreadystatechange = function() {
+			if (req.readyState !== 4) {
+			  return;
+			}
+			if (!req.status || req.status < 200 || req.status > 299) {
+			  return;
+			}
+			if (callback && req.responseText) {
+			  callback( JSON.parse(req.responseText) );
+			}
 		}
-		if (!req.status || req.status < 200 || req.status > 299) {
-		  return;
+
+		req.open('GET', url);
+		req.send(null);
+
+	};
+
+
+	// load fetches data from the Overpass API for the given bounding box
+	// PARAMETERS:
+	// 	bbox 		--> a four float array consisting of [ <min lon>, <min lat>, <max lon>, <max lat> ], 
+	// 	callback 	--> a callback function to be called when the data is returned
+	this.load = function( bbox, callback ) {
+		var params = {
+			e: bbox[2],
+			n: bbox[3],
+			s: bbox[1],
+			w: bbox[0]
 		}
-		if (callback && req.responseText) {
-		  callback( JSON.parse(req.responseText) );
-		}
+		//xhr( OSM_XAPI_URL, params, callback );
+		xhr( FAKE_OVERPASS, params, callback );
 	}
 
-//	changeState(0);
-	req.open('GET', url);
-//	changeState(1);
-	req.send(null);
-//	changeState(2);
-
-};
-
-
-
-
-// load fetches data from the Overpass API for the given bounding box
-// bbox --> a four float array consisting of [ <min lon>, <min lat>, <max lon>, <max lat> ], 
-// callback --> a callback function to be called when the data is returned
-function load( bbox, callback ) {
-	var params = {
-		e: bbox[2],
-		n: bbox[3],
-		s: bbox[1],
-		w: bbox[0]
-	}
-	//xhr( OSM_XAPI_URL, params, callback );
-	xhr( FAKE_OVERPASS, params, callback );
 }
 
-module.exports = {
-	load: load
-}
-},{}],6:[function(require,module,exports){
+module.exports = constructor;
+},{}],4:[function(require,module,exports){
 
-var loader = require("./loader.js"),
-	data = require("./data.js");
+var Loader = require("./loader.js"),
+	Parser = require("./parser.js");
 	Builder = require("./builder.js");
 
-function loadData( scene, bbox, params ) {
+// makeBuildings fetches data from the Overpass API and builds three.js 3d models of buildings for everything
+// found within the given bounding box.
+// PARAMETERS:
+//	scene 	 --> a three.js Scene object that the building models will be added into via its add method
+//	bbox 	 --> a four float array specifying the min and max latitude and longitude coordinates whithin which to fetch
+//				 buildings.  [ <min_lon>, <min_lat>, <max_lon>, <max_lat> ] (Note: It's lon,lat not lat,lon)
+//	params 	 --> an object that contains optional parameters to further control how the buildings are created. They are
+//				 are as follows:
+//				{
+//					origin 			--> an array, [ lon, lat ], describing the poisition of the scene's origin;
+//										default is to treat the min point of the bounding box as the origin,	
+//					units  			--> 'meter', 'foot', 'inch', or 'millimeter'; default is meter,
+//					scale  			--> float describing how much to scale the units for the scene; default is 1.0,
+//					mergeGeometry 	--> boolean indicating whether to merge all of the buildings into a single Geomtetry
+//										object represented by a single Mesh object, or whether to create individual objects
+//										for each building in the OSM data. Merging is recommended when working with large
+//										numbers of buildings;  default is false,
+//					onDataReady 	--> A callback that will be called when the data is loaded, but before it is added to
+//										the scene.  This can be used to bind the building data into a different context, or
+//										to filter or modify it before being added to the scene,
+//					onMeshReady  	--> A callback which must return either true or false that gets called before a building 
+//										mesh is added to the scene. If it returns false then the mesh is not added to the scene. 
+//  			} 
+function makeBuildings( scene, bbox, params ) {
 	
-	// TODO Actually consider the params...
-	// 		check and process things, etc...
-	params = params || {};
+	var 
+		params = params || {},
+		origin = params.origin || [ bbox[0], bbox[1] ],
+		units = params.units || 'meter',
+		scale = params.scale || 1.0,
+		mergeGeometry = params.mergeGeometry || false,
+		onDataReady = params.onDataReady || function() {},
+		onMeshReady = params.onMeshReady || function() {return true};
 
-	var scale = params.scale || 100000;
+	// TODO Actually use all the params
 
-	var builder = new Builder( scene, scale, [ 114.15, 22.2675 ] );
+	var builder = new Builder( scene, scale, origin ),
+		parser = new Parser( builder.build ),
+		loader = new Loader();
 	
-	loader.load( bbox, data.process );
+	loader.load( bbox, parser.parse );
 
 }
 
+
+module.exports = {
+	makeBuildings: makeBuildings
+}
+
+// Maybe put this in a separte wrapper file, included in a version for use in a non-NPM context
 window.OSM3 = {
-	loadData: loadData
+	makeBuildings: makeBuildings
 }
 
-},{"./builder.js":1,"./data.js":3,"./loader.js":5}]},{},[6])
+},{"./builder.js":1,"./loader.js":3,"./parser.js":5}],5:[function(require,module,exports){
+
+var importer = require('./importer.js' );
+
+function constructor( readyCallback ) {
+
+	var _nodes = {},
+		_ways = {},
+		_relations = {},
+		MAP_DATA = []
+
+
+	function isBuilding(data) {
+		var tags = data.tags;
+		return (tags && !tags.landuse &&
+		  (tags.building || tags['building:part']) && (!tags.layer || tags.layer >= 0));
+	}
+
+
+	function getRelationWays(members) {
+		var m, outer, inner = [];
+		for (var i = 0, il = members.length; i < il; i++) {
+		  m = members[i];
+		  if (m.type !== 'way' || !_ways[m.ref]) {
+		    continue;
+		  }
+		  if (!m.role || m.role === 'outer') {
+		    outer = _ways[m.ref];
+		    continue;
+		  }
+		  if (m.role === 'inner' || m.role === 'enclave') {
+		    inner.push(_ways[m.ref]);
+		    continue;
+		  }
+		}
+
+		//  if (outer && outer.tags) {
+		if (outer) { // allows tags to be attached to relation - instead of outer way
+		  return { outer:outer, inner:inner };
+		}
+	}
+
+
+	function getFootprint(points) {
+	    if (!points) {
+	      return;
+	    }
+
+	    var footprint = [], p;
+	    for (var i = 0, il = points.length; i < il; i++) {
+	      	p = _nodes[ points[i] ];
+	      	footprint.push(p[0], p[1]);
+	    }
+
+	    // do not close polygon yet
+	    if (footprint[footprint.length-2] !== footprint[0] && footprint[footprint.length-1] !== footprint[1]) {
+	      	footprint.push(footprint[0], footprint[1]);
+	    }
+
+	    // can't span a polygon with just 2 points (+ start & end)
+	    if (footprint.length < 8) {
+	      	return;
+	    }
+
+	    return footprint;
+	}
+
+
+
+	function mergeItems(dst, src) {
+	    for (var p in src) {
+	      if (src.hasOwnProperty(p)) {
+	        dst[p] = src[p];
+	      }
+	    }
+	    return dst;
+	}
+
+
+	function filterItem(item, footprint) {
+	    var res = importer.alignProperties(item.tags);
+	    res.tags = item.tags;  // Keeping the raw tags too
+	    if (item.id) {
+	      res.id = item.id;
+	    }
+
+	    if (footprint) {
+	      res.footprint = importer.makeWinding(footprint, importer.clockwise);
+	    }
+
+	    if (res.shape === 'cone' || res.shape === 'cylinder') {
+	      res.radius = importer.getRadius(res.footprint);
+	    }
+
+	    return res;
+	}
+
+
+	function processNode(node) {
+		_nodes[node.id] = [node.lat, node.lon];
+	}
+
+
+	function processWay(way) {
+		if (isBuilding(way)) {
+		  	var item, footprint;
+		  	if ( footprint = getFootprint(way.nodes) ) {
+		    	item = filterItem(way, footprint);
+		    	MAP_DATA.push(item);
+		  	}
+		  	return;
+		}
+
+		var tags = way.tags;
+		if (!tags || (!tags.highway && !tags.railway && !tags.landuse)) { // TODO: add more filters
+		  	_ways[way.id] = way;
+		}
+	}
+
+
+	function processRelation(relation) {
+		var relationWays, outerWay, holes = [],
+		  	item, relItem, outerFootprint, innerFootprint;
+		if (!isBuilding(relation) ||
+		  	(relation.tags.type !== 'multipolygon' && relation.tags.type !== 'building') ) {
+		  	return;
+		}
+
+		if ((relationWays = getRelationWays(relation.members))) {
+		  	relItem = filterItem(relation);
+		  	if ((outerWay = relationWays.outer)) {
+		    	if ((outerFootprint = getFootprint(outerWay.nodes)) && _callback(outerWay) !== false) {
+			      	item = filterItem(outerWay, outerFootprint);
+			      	for (var i = 0, il = relationWays.inner.length; i < il; i++) {
+			        	if ((innerFootprint = getFootprint(relationWays.inner[i].nodes))) {
+			          		holes.push( importer.makeWinding(innerFootprint, importer.counterClockwise) );
+			        	}
+			      	}
+			      	if (holes.length) {
+			        	item.holes = holes;
+			      	}
+			      	MAP_DATA.push( mergeItems(item, relItem) );
+		    	}
+		  	}
+		}
+	}
+
+
+	this.parse = function( osmData ) {
+		var item;
+		for ( var i = 0, len = osmData.elements.length; i < len; i++ ) {
+			item = osmData.elements[i];
+			switch ( item.type ) {
+				case 'node': processNode( item ); break;
+				case 'way': processWay( item ); break;
+				case 'relation': processRelation( item ); break;
+			}
+		}
+		readyCallback.apply( this, [ MAP_DATA ] )
+	}
+
+
+}
+
+module.exports = constructor;
+},{"./importer.js":2}]},{},[4])

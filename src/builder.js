@@ -1,6 +1,4 @@
 
-var controller = require('./controller.js');
-
 
 function constructor( scene, scale, origin ) {
 
@@ -8,8 +6,6 @@ function constructor( scene, scale, origin ) {
 		_scene = scene,
 		_scale = scale,
 		_origin = lonLatToWorld( origin[0], origin[1] );
-
-	controller.subscribe( 'dataReady', build );
 
 
 	function latlonDistMeters( lon1, lat1, lon2, lat2 ){  // generally used geo measurement function
@@ -38,7 +34,7 @@ function constructor( scene, scale, origin ) {
 	}
 
 
-	function build( items ) {
+	this.build = function( items ) {
 
 		var bldg, currVerLen,
 			mats = [],
@@ -47,6 +43,7 @@ function constructor( scene, scale, origin ) {
 
 		for ( var i=0, len=items.length; i < len; i++ ) {
 			bldg = makeBldgGeom( items[i] );
+			_scene.add( new THREE.Mesh( bldg, new THREE.MeshNormalMaterial() ) );
 			//currVerLen = geom.vertices.length;
 			//geom.vertices = geom.vertices.concat( bldg.vertices );
 			//geom.faces = geom.faces.concat( updateFaces( bldg.faces, currVerLen ) );
@@ -55,7 +52,6 @@ function constructor( scene, scale, origin ) {
 			//for ( var j = 0, fLen = bldg.faces.length; j < fLen; j++ ) {
 				//ids.push( i );
 			//}
-			_scene.add( new THREE.Mesh( bldg, new THREE.MeshNormalMaterial() ) );
 		}
 
 		// TODO Create the mesh object and any necessary material objects

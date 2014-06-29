@@ -1,6 +1,6 @@
 {
   "name": "osmthree",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Import OSM data into a three.js scene",
   "main": "bin/osmthree.js",
   "bin": {

@@ -24,7 +24,6 @@
 		S.container.appendChild( S.renderer.domElement );
 		
 		// Camera setup
-		//S.camera = new THREE.PerspectiveCamera( 45, S.container.innerHeight / S.container.innerWidth, 1, 1000 );
 		S.camera = new THREE.PerspectiveCamera( 45, S.container.offsetWidth / S.container.offsetHeight, 1, 10000 );
 		S.camera.position.z = 400;
 		S.camera.position.x = -400;
@@ -33,7 +32,7 @@
 		// Controls setup
 		S.controls = new THREE.OrbitControls( S.camera, S.container );
 
-    	OSM3.loadData( S.scene, [ 114.15, 22.2675, 114.165, 22.275 ], { scale: 100000 } );
+    	OSM3.makeBuildings( S.scene, [ 114.15, 22.2675, 114.165, 22.275 ], { scale: 1 } );
 
     	function animate() {
 			S.controls.update();
