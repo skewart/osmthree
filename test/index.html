@@ -32,7 +32,8 @@
 		// Controls setup
 		S.controls = new THREE.OrbitControls( S.camera, S.container );
 
-    	OSM3.makeBuildings( S.scene, [ 114.15, 22.2675, 114.165, 22.275 ], { scale: 1 } );
+    	OSM3.makeBuildings( S.scene, [-122.43, 37.77, -122.415, 37.7775  ], { scale: 1 } );
+        //OSM3.makeBuildings( S.scene, [ 114.15, 22.2675, 114.165, 22.275 ], { scale: 1 } );
 
     	function animate() {
 			S.controls.update();

@@ -62,8 +62,8 @@ function constructor() {
 			s: bbox[1],
 			w: bbox[0]
 		}
-		//xhr( OSM_XAPI_URL, params, callback );
-		xhr( FAKE_OVERPASS, params, callback );
+		xhr( OSM_XAPI_URL, params, callback );
+		//xhr( FAKE_OVERPASS, params, callback );
 	}
 
 }

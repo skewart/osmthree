@@ -431,8 +431,8 @@ function constructor() {
 			s: bbox[1],
 			w: bbox[0]
 		}
-		//xhr( OSM_XAPI_URL, params, callback );
-		xhr( FAKE_OVERPASS, params, callback );
+		xhr( OSM_XAPI_URL, params, callback );
+		//xhr( FAKE_OVERPASS, params, callback );
 	}
 
 }
@@ -629,7 +629,7 @@ function constructor( readyCallback ) {
 		if ((relationWays = getRelationWays(relation.members))) {
 		  	relItem = filterItem(relation);
 		  	if ((outerWay = relationWays.outer)) {
-		    	if ((outerFootprint = getFootprint(outerWay.nodes)) && _callback(outerWay) !== false) {
+		    	if (outerFootprint = getFootprint(outerWay.nodes)) {
 			      	item = filterItem(outerWay, outerFootprint);
 			      	for (var i = 0, il = relationWays.inner.length; i < il; i++) {
 			        	if ((innerFootprint = getFootprint(relationWays.inner[i].nodes))) {
