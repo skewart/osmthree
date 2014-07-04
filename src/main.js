@@ -1,6 +1,6 @@
 
 var Loader = require("./loader.js"),
-	Parser = require("./parser.js");
+	Parser = require("./parser.js"),
 	Builder = require("./builder.js");
 
 // makeBuildings fetches data from the Overpass API and builds three.js 3d models of buildings for everything
@@ -9,38 +9,24 @@ var Loader = require("./loader.js"),
 //	scene 	 --> a three.js Scene object that the building models will be added into via its add method
 //	bbox 	 --> a four float array specifying the min and max latitude and longitude coordinates whithin which to fetch
 //				 buildings.  [ <min_lon>, <min_lat>, <max_lon>, <max_lat> ] (Note: It's lon,lat not lat,lon)
-//	params 	 --> an object that contains optional parameters to further control how the buildings are created. They are
-//				 are as follows:
-//				{
-//					origin 			--> an array, [ lon, lat ], describing the poisition of the scene's origin;
-//										default is to treat the min point of the bounding box as the origin,	
-//					units  			--> 'meter', 'foot', 'inch', or 'millimeter'; default is meter,
-//					scale  			--> float describing how much to scale the units for the scene; default is 1.0,
-//					mergeGeometry 	--> boolean indicating whether to merge all of the buildings into a single Geomtetry
-//										object represented by a single Mesh object, or whether to create individual objects
-//										for each building in the OSM data. Merging is recommended when working with large
-//										numbers of buildings;  default is false,
-//					onDataReady 	--> A callback that will be called when the data is loaded, but before it is added to
-//										the scene.  This can be used to bind the building data into a different context, or
-//										to filter or modify it before being added to the scene,
-//					onMeshReady  	--> A callback which must return either true or false that gets called before a building 
-//										mesh is added to the scene. If it returns false then the mesh is not added to the scene. 
-//  			} 
+//	params 	 --> an object that contains optional parameters to further control how the buildings are created.  See the source code.
 function makeBuildings( scene, bbox, params ) {
 	
 	var 
-		params = params || {},
-		origin = params.origin || [ bbox[0], bbox[1] ],
-		units = params.units || 'meter',
-		scale = params.scale || 1.0,
-		mergeGeometry = params.mergeGeometry || false,
-		onDataReady = params.onDataReady || function() {},
-		onMeshReady = params.onMeshReady || function() {return true};
+		buildOpts = {},
+		params = params || {}, 
+		origin = params.origin || [ bbox[0], bbox[1] ],  		// an array, [ lon, lat ], describing the poisition of the scene's origin
+		units = params.units || 'meter', 						// 'meter', 'foot', 'inch', or 'millimeter'
+		scale = params.scale || 1.0,  							// float describing how much to scale the units for the scene
+		onDataReady = params.onDataReady || false;				// called when data is loaded from Overpass, before THREE objects are created
 
-	// TODO Actually use all the params
+	buildOpts.mergeGeometry = params.mergeGeometry || false;  	// create one big Geometry and Mesh with all the buildings
+	buildOpts.defaultColor = params.defaultColor || false;		// most buildings will be this color - default is 0xF0F0F0
+	buildOpts.meshFunction = params.meshFunction || false;		// custom function for creating the THREE.Mesh objects
 
-	var builder = new Builder( scene, scale, origin ),
-		parser = new Parser( builder.build ),
+	var 
+		builder = new Builder( scene, scale, origin, buildOpts ),
+		parser = new Parser( builder.build, onDataReady ),
 		loader = new Loader();
 	
 	loader.load( bbox, parser.parse );

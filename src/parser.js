@@ -1,12 +1,12 @@
 
 var importer = require('./importer.js' );
 
-function constructor( readyCallback ) {
+function constructor( finalCallback, filterCallback ) {
 
 	var _nodes = {},
 		_ways = {},
 		_relations = {},
-		MAP_DATA = []
+		MAP_DATA = [];
 
 
 	function isBuilding(data) {
@@ -146,7 +146,7 @@ function constructor( readyCallback ) {
 
 
 	this.parse = function( osmData ) {
-		var item;
+		var item, buildData;
 		for ( var i = 0, len = osmData.elements.length; i < len; i++ ) {
 			item = osmData.elements[i];
 			switch ( item.type ) {
@@ -155,7 +155,9 @@ function constructor( readyCallback ) {
 				case 'relation': processRelation( item ); break;
 			}
 		}
-		readyCallback.apply( this, [ MAP_DATA ] )
+		( filterCallback ) ? buildData = filterCallback.call( this, MAP_DATA )
+						   : buildData = MAP_DATA;
+		finalCallback.apply( this, [ buildData ] );
 	}
 
 

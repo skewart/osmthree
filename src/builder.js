@@ -1,11 +1,14 @@
 
 
-function constructor( scene, scale, origin ) {
+function constructor( scene, scale, origin, options ) {
 
 	var 
+		options = options || {},
 		_scene = scene,
 		_scale = scale,
-		_origin = lonLatToWorld( origin[0], origin[1] );
+		_origin = lonLatToWorld( origin[0], origin[1] ),
+		_meshCallback = options.meshCallback || createMesh,
+		_defaultColor = options.defaultColor || 0xf0f0f0;
 
 
 	function latlonDistMeters( lon1, lat1, lon2, lat2 ){  // generally used geo measurement function
@@ -34,6 +37,31 @@ function constructor( scene, scale, origin ) {
 	}
 
 
+	function createMesh( geom, osmData ) {
+		//	return new THREE.Mesh( geom, new THREE.MeshLambertMaterial() );
+		var face,
+			mats = [],
+			wci = 0,
+			rci = 0;
+		if ( osmData.wallColor ) {
+			mats.push( new THREE.MeshLambertMaterial( {color: osmData.wallColor }) );
+		} else {
+			mats.push( new THREE.MeshLambertMaterial( {color: _defaultColor } ) );
+		}
+		if ( osmData.roofColor ) {
+			mats.push( new THREE.MeshLambertMaterial( {color: osmData.roofColor }) );
+			rci = 1;
+		}
+		for ( var i=0, len=geom.faces.length; i < len; i++ ) {
+			face = geom.faces[i];
+			( face.normal.y === 1 ) ? face.materialIndex = rci
+								    : face.materialIndex = wci;
+		}
+		var m = new THREE.Mesh( geom, new THREE.MeshFaceMaterial( mats ) );
+		return m;
+	}
+
+
 	this.build = function( items ) {
 
 		var bldg, currVerLen,
@@ -43,7 +71,9 @@ function constructor( scene, scale, origin ) {
 
 		for ( var i=0, len=items.length; i < len; i++ ) {
 			bldg = makeBldgGeom( items[i] );
-			_scene.add( new THREE.Mesh( bldg, new THREE.MeshNormalMaterial() ) );
+			if (bldg) { 
+				_scene.add( _meshCallback.call( this, bldg, items[i] ) );
+			}
 			//currVerLen = geom.vertices.length;
 			//geom.vertices = geom.vertices.concat( bldg.vertices );
 			//geom.faces = geom.faces.concat( updateFaces( bldg.faces, currVerLen ) );
@@ -68,20 +98,19 @@ function constructor( scene, scale, origin ) {
 		latRad = lat*Math.PI/180;
 		mercN = Math.log( Math.tan((Math.PI/4)+(latRad/2)));
 		y = (worldHeight/2)-(worldHeight*mercN/(2*Math.PI));
-
 		return [ x, y ]
 	}
 
 
 	function lonLatToScene( lon, lat ) {
 		var point = lonLatToWorld( lon, lat );
-		return new THREE.Vector2( point[0] - _origin[0], point[1] - _origin[1] );
+		return new THREE.Vector2( _origin[1] - point[1], _origin[0] - point[0] );
 	}
 
 
 	function makeBldgGeom( item ) {
 		// Create a path
-		var pointX, pointY, extrudePath,
+		var pointX, pointY, extrudePath, eg,
 			path, shapes,
 			bldgHeight = item.height,
 			pathPoints = [];
@@ -97,7 +126,8 @@ function constructor( scene, scale, origin ) {
 		extrudePath.add( new THREE.LineCurve3( new THREE.Vector3(0,0,0), new THREE.Vector3(0,bldgHeight,0) ) );
 
 		eg = new THREE.ExtrudeGeometry( shapes, {
-			extrudePath: extrudePath
+			extrudePath: extrudePath,
+			material: 0
 		})
 
 		return eg;

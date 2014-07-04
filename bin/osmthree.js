@@ -1,12 +1,15 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 
 
-function constructor( scene, scale, origin ) {
+function constructor( scene, scale, origin, options ) {
 
 	var 
+		options = options || {},
 		_scene = scene,
 		_scale = scale,
-		_origin = lonLatToWorld( origin[0], origin[1] );
+		_origin = lonLatToWorld( origin[0], origin[1] ),
+		_meshCallback = options.meshCallback || createMesh,
+		_defaultColor = options.defaultColor || 0xf0f0f0;
 
 
 	function latlonDistMeters( lon1, lat1, lon2, lat2 ){  // generally used geo measurement function
@@ -35,6 +38,31 @@ function constructor( scene, scale, origin ) {
 	}
 
 
+	function createMesh( geom, osmData ) {
+		//	return new THREE.Mesh( geom, new THREE.MeshLambertMaterial() );
+		var face,
+			mats = [],
+			wci = 0,
+			rci = 0;
+		if ( osmData.wallColor ) {
+			mats.push( new THREE.MeshLambertMaterial( {color: osmData.wallColor }) );
+		} else {
+			mats.push( new THREE.MeshLambertMaterial( {color: _defaultColor } ) );
+		}
+		if ( osmData.roofColor ) {
+			mats.push( new THREE.MeshLambertMaterial( {color: osmData.roofColor }) );
+			rci = 1;
+		}
+		for ( var i=0, len=geom.faces.length; i < len; i++ ) {
+			face = geom.faces[i];
+			( face.normal.y === 1 ) ? face.materialIndex = rci
+								    : face.materialIndex = wci;
+		}
+		var m = new THREE.Mesh( geom, new THREE.MeshFaceMaterial( mats ) );
+		return m;
+	}
+
+
 	this.build = function( items ) {
 
 		var bldg, currVerLen,
@@ -44,7 +72,9 @@ function constructor( scene, scale, origin ) {
 
 		for ( var i=0, len=items.length; i < len; i++ ) {
 			bldg = makeBldgGeom( items[i] );
-			_scene.add( new THREE.Mesh( bldg, new THREE.MeshNormalMaterial() ) );
+			if (bldg) { 
+				_scene.add( _meshCallback.call( this, bldg, items[i] ) );
+			}
 			//currVerLen = geom.vertices.length;
 			//geom.vertices = geom.vertices.concat( bldg.vertices );
 			//geom.faces = geom.faces.concat( updateFaces( bldg.faces, currVerLen ) );
@@ -69,20 +99,19 @@ function constructor( scene, scale, origin ) {
 		latRad = lat*Math.PI/180;
 		mercN = Math.log( Math.tan((Math.PI/4)+(latRad/2)));
 		y = (worldHeight/2)-(worldHeight*mercN/(2*Math.PI));
-
 		return [ x, y ]
 	}
 
 
 	function lonLatToScene( lon, lat ) {
 		var point = lonLatToWorld( lon, lat );
-		return new THREE.Vector2( point[0] - _origin[0], point[1] - _origin[1] );
+		return new THREE.Vector2( _origin[1] - point[1], _origin[0] - point[0] );
 	}
 
 
 	function makeBldgGeom( item ) {
 		// Create a path
-		var pointX, pointY, extrudePath,
+		var pointX, pointY, extrudePath, eg,
 			path, shapes,
 			bldgHeight = item.height,
 			pathPoints = [];
@@ -98,7 +127,8 @@ function constructor( scene, scale, origin ) {
 		extrudePath.add( new THREE.LineCurve3( new THREE.Vector3(0,0,0), new THREE.Vector3(0,bldgHeight,0) ) );
 
 		eg = new THREE.ExtrudeGeometry( shapes, {
-			extrudePath: extrudePath
+			extrudePath: extrudePath,
+			material: 0
 		})
 
 		return eg;
@@ -374,8 +404,7 @@ module.exports = {
 function constructor() {
 
 	var OSM_XAPI_URL = 'http://overpass-api.de/api/interpreter?data=[out:json];(way[%22building%22]({s},{w},{n},{e});node(w);way[%22building:part%22=%22yes%22]({s},{w},{n},{e});node(w);relation[%22building%22]({s},{w},{n},{e});way(r);node(w););out;';
-	var FAKE_OVERPASS = '/test/fake_osm.json'
-
+	
 	var req = new XMLHttpRequest();
 
 	function xhr(url, param, callback) {
@@ -432,7 +461,6 @@ function constructor() {
 			w: bbox[0]
 		}
 		xhr( OSM_XAPI_URL, params, callback );
-		//xhr( FAKE_OVERPASS, params, callback );
 	}
 
 }
@@ -441,7 +469,7 @@ module.exports = constructor;
 },{}],4:[function(require,module,exports){
 
 var Loader = require("./loader.js"),
-	Parser = require("./parser.js");
+	Parser = require("./parser.js"),
 	Builder = require("./builder.js");
 
 // makeBuildings fetches data from the Overpass API and builds three.js 3d models of buildings for everything
@@ -450,38 +478,24 @@ var Loader = require("./loader.js"),
 //	scene 	 --> a three.js Scene object that the building models will be added into via its add method
 //	bbox 	 --> a four float array specifying the min and max latitude and longitude coordinates whithin which to fetch
 //				 buildings.  [ <min_lon>, <min_lat>, <max_lon>, <max_lat> ] (Note: It's lon,lat not lat,lon)
-//	params 	 --> an object that contains optional parameters to further control how the buildings are created. They are
-//				 are as follows:
-//				{
-//					origin 			--> an array, [ lon, lat ], describing the poisition of the scene's origin;
-//										default is to treat the min point of the bounding box as the origin,	
-//					units  			--> 'meter', 'foot', 'inch', or 'millimeter'; default is meter,
-//					scale  			--> float describing how much to scale the units for the scene; default is 1.0,
-//					mergeGeometry 	--> boolean indicating whether to merge all of the buildings into a single Geomtetry
-//										object represented by a single Mesh object, or whether to create individual objects
-//										for each building in the OSM data. Merging is recommended when working with large
-//										numbers of buildings;  default is false,
-//					onDataReady 	--> A callback that will be called when the data is loaded, but before it is added to
-//										the scene.  This can be used to bind the building data into a different context, or
-//										to filter or modify it before being added to the scene,
-//					onMeshReady  	--> A callback which must return either true or false that gets called before a building 
-//										mesh is added to the scene. If it returns false then the mesh is not added to the scene. 
-//  			} 
+//	params 	 --> an object that contains optional parameters to further control how the buildings are created.  See the source code.
 function makeBuildings( scene, bbox, params ) {
 	
 	var 
-		params = params || {},
-		origin = params.origin || [ bbox[0], bbox[1] ],
-		units = params.units || 'meter',
-		scale = params.scale || 1.0,
-		mergeGeometry = params.mergeGeometry || false,
-		onDataReady = params.onDataReady || function() {},
-		onMeshReady = params.onMeshReady || function() {return true};
+		buildOpts = {},
+		params = params || {}, 
+		origin = params.origin || [ bbox[0], bbox[1] ],  		// an array, [ lon, lat ], describing the poisition of the scene's origin
+		units = params.units || 'meter', 						// 'meter', 'foot', 'inch', or 'millimeter'
+		scale = params.scale || 1.0,  							// float describing how much to scale the units for the scene
+		onDataReady = params.onDataReady || false;				// called when data is loaded from Overpass, before THREE objects are created
 
-	// TODO Actually use all the params
+	buildOpts.mergeGeometry = params.mergeGeometry || false;  	// create one big Geometry and Mesh with all the buildings
+	buildOpts.defaultColor = params.defaultColor || false;		// most buildings will be this color - default is 0xF0F0F0
+	buildOpts.meshFunction = params.meshFunction || false;		// custom function for creating the THREE.Mesh objects
 
-	var builder = new Builder( scene, scale, origin ),
-		parser = new Parser( builder.build ),
+	var 
+		builder = new Builder( scene, scale, origin, buildOpts ),
+		parser = new Parser( builder.build, onDataReady ),
 		loader = new Loader();
 	
 	loader.load( bbox, parser.parse );
@@ -502,12 +516,12 @@ window.OSM3 = {
 
 var importer = require('./importer.js' );
 
-function constructor( readyCallback ) {
+function constructor( finalCallback, filterCallback ) {
 
 	var _nodes = {},
 		_ways = {},
 		_relations = {},
-		MAP_DATA = []
+		MAP_DATA = [];
 
 
 	function isBuilding(data) {
@@ -647,7 +661,7 @@ function constructor( readyCallback ) {
 
 
 	this.parse = function( osmData ) {
-		var item;
+		var item, buildData;
 		for ( var i = 0, len = osmData.elements.length; i < len; i++ ) {
 			item = osmData.elements[i];
 			switch ( item.type ) {
@@ -656,7 +670,9 @@ function constructor( readyCallback ) {
 				case 'relation': processRelation( item ); break;
 			}
 		}
-		readyCallback.apply( this, [ MAP_DATA ] )
+		( filterCallback ) ? buildData = filterCallback.call( this, MAP_DATA )
+						   : buildData = MAP_DATA;
+		finalCallback.apply( this, [ buildData ] );
 	}
 
 
