@@ -1,12 +1,13 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 
 
-function constructor( scene, scale, origin ) {
+function constructor( scene, scale, origin, onComplete ) {
 
 	var 
 		_scene = scene,
 		_scale = scale,
-		_origin = lonLatToWorld( origin[0], origin[1] );
+		_origin = lonLatToWorld( origin[0], origin[1] ),
+        _onComplete = onComplete;
 
 
 	function latlonDistMeters( lon1, lat1, lon2, lat2 ){  // generally used geo measurement function
@@ -57,7 +58,7 @@ function constructor( scene, scale, origin ) {
 
 		// TODO Create the mesh object and any necessary material objects
 		//_scene.add( new THREE.Mesh( geom, new THREE.MeshNormalMaterial() ) );
-
+        _onComplete.call();
 	}
 
 	function lonLatToWorld( lon, lat ) {
@@ -476,11 +477,12 @@ function makeBuildings( scene, bbox, params ) {
 		scale = params.scale || 1.0,
 		mergeGeometry = params.mergeGeometry || false,
 		onDataReady = params.onDataReady || function() {},
-		onMeshReady = params.onMeshReady || function() {return true};
+		onMeshReady = params.onMeshReady || function() {return true},
+        onComplete = params.onComplete || function() {};
 
 	// TODO Actually use all the params
 
-	var builder = new Builder( scene, scale, origin ),
+	var builder = new Builder( scene, scale, origin, onComplete ),
 		parser = new Parser( builder.build ),
 		loader = new Loader();
 	
