@@ -1,14 +1,42 @@
 
 
-function constructor( scene, scale, origin, options ) {
+function constructor( readyCallback, scale, origin, options ) {
 
 	var 
 		options = options || {},
-		_scene = scene,
+		_readyCallback = readyCallback,
 		_scale = scale,
 		_origin = lonLatToWorld( origin[0], origin[1] ),
 		_meshCallback = options.meshCallback || createMesh,
 		_defaultColor = options.defaultColor || 0xf0f0f0;
+
+
+	this.build = function( items ) {
+
+		var bldg, currVerLen,
+			mats = [],
+			ids = [];
+			//geom = new THREE.Geometry();
+
+		for ( var i=0, len=items.length; i < len; i++ ) {
+			bldg = makeBldgGeom( items[i] );
+			if (bldg) { 
+				_readyCallback( _meshCallback.call( this, bldg, items[i] ) );
+			}
+			//currVerLen = geom.vertices.length;
+			//geom.vertices = geom.vertices.concat( bldg.vertices );
+			//geom.faces = geom.faces.concat( updateFaces( bldg.faces, currVerLen ) );
+			//mats = mats.concat( bldg.materials );
+			// Is this really necessary?
+			//for ( var j = 0, fLen = bldg.faces.length; j < fLen; j++ ) {
+				//ids.push( i );
+			//}
+		}
+
+		// TODO Create the mesh object and any necessary material objects
+		//_scene.add( new THREE.Mesh( geom, new THREE.MeshNormalMaterial() ) );
+
+	}
 
 
 	function latlonDistMeters( lon1, lat1, lon2, lat2 ){  // generally used geo measurement function
@@ -58,36 +86,10 @@ function constructor( scene, scale, origin, options ) {
 								    : face.materialIndex = wci;
 		}
 		var m = new THREE.Mesh( geom, new THREE.MeshFaceMaterial( mats ) );
+		m.footprint = osmData.footprint;
 		return m;
 	}
 
-
-	this.build = function( items ) {
-
-		var bldg, currVerLen,
-			mats = [],
-			ids = [];
-			//geom = new THREE.Geometry();
-
-		for ( var i=0, len=items.length; i < len; i++ ) {
-			bldg = makeBldgGeom( items[i] );
-			if (bldg) { 
-				_scene.add( _meshCallback.call( this, bldg, items[i] ) );
-			}
-			//currVerLen = geom.vertices.length;
-			//geom.vertices = geom.vertices.concat( bldg.vertices );
-			//geom.faces = geom.faces.concat( updateFaces( bldg.faces, currVerLen ) );
-			//mats = mats.concat( bldg.materials );
-			// Is this really necessary?
-			//for ( var j = 0, fLen = bldg.faces.length; j < fLen; j++ ) {
-				//ids.push( i );
-			//}
-		}
-
-		// TODO Create the mesh object and any necessary material objects
-		//_scene.add( new THREE.Mesh( geom, new THREE.MeshNormalMaterial() ) );
-
-	}
 
 	function lonLatToWorld( lon, lat ) {
 		var x, y, pointX, pointY, latRad, mercN,
