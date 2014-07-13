@@ -5,7 +5,6 @@
 function constructor() {
 
 	var OSM_XAPI_URL = 'http://overpass-api.de/api/interpreter?data=[out:json];(way[%22building%22]({s},{w},{n},{e});node(w);way[%22building:part%22=%22yes%22]({s},{w},{n},{e});node(w);relation[%22building%22]({s},{w},{n},{e});way(r);node(w););out;';
-		FAKE_URL = '/test/fake_osm.json'
 
 	var req = new XMLHttpRequest();
 
@@ -62,7 +61,7 @@ function constructor() {
 			s: bbox[1],
 			w: bbox[0]
 		}
-		xhr( FAKE_URL, params, callback );
+		xhr( OSM_XAPI_URL, params, callback );
 	}
 
 }
