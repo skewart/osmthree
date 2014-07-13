@@ -39,19 +39,6 @@ function constructor( readyCallback, scale, origin, options ) {
 	}
 
 
-	function latlonDistMeters( lon1, lat1, lon2, lat2 ){  // generally used geo measurement function
-	    var R = 6378.137, // Radius of earth in KM
-	    	dLat = (lat2 - lat1) * Math.PI / 180,
-	    	dLon = (lon2 - lon1) * Math.PI / 180,
-	    	a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-	    		Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-	    		Math.sin(dLon/2) * Math.sin(dLon/2),
-	    	c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)),
-	    	d = R * c;
-	    return d * 1000; // meters
-	}
-
-
 	function updateFaces( faces, len ) {
 		for ( var i=0, flen = faces.length; i < flen; i++ ) {
 			faces[i].a += len;
@@ -106,6 +93,9 @@ function constructor( readyCallback, scale, origin, options ) {
 
 	function lonLatToScene( lon, lat ) {
 		var point = lonLatToWorld( lon, lat );
+		// This looks weird, and it is kind of a hack, but it's done because of the way THREE.ExtrudeGeometry converts
+		// Vector2 x,y coordinates into x,z coordinates in Vector3 objects.  +x +y goes to -z,-x.  This effectively rotates
+		// the geometries, putting them in the correct quadrant.   Doing an actual rotation might be cleaner, but, well.
 		return new THREE.Vector2( _origin[1] - point[1], _origin[0] - point[0] );
 	}
 
